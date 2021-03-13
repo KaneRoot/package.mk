@@ -13,6 +13,13 @@ move_content(){
 	mv -v "${content}" "${new_dir}"
 }
 
+remove_empty_directories(){
+	# Search for directories, reverse the order then try to remove them.
+	find . -type d | sort -r | while read dir; do
+		rmdir "${dir}" 2>/dev/null
+	done
+}
+
 # usage: create_split new_root regex [regex...]
 create_split(){
 	new_root=$1 ; shift
@@ -24,8 +31,10 @@ create_split(){
 				if [ $? -eq 0 ] ; then
 					move_content "${new_root}" "${F}"
 				fi
-				: # Do not end the function with a potential error.
 			done
 		fi
 	done
+
+	remove_empty_directories
+	: # Do not end the function with a potential error.
 }

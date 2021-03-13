@@ -3,6 +3,8 @@ name    = xz
 version = 5.2.4
 URL = https://tukaani.org/xz/xz-$(version).tar.xz
 
+patches = file1.patch file2.patch
+
 # for test purposes
 SYSCONF=.
 

@@ -3,8 +3,6 @@
 # Used by default for working directory and log file names
 gen_uuid != uuidgen
 
-# TODO: patches => automatic patching + meta
-
 # Main configuration variables
 
 SLOT ?= /usr/baguette
@@ -19,6 +17,7 @@ ARCH_DETECTED != uname -m
 ARCH ?= $(ARCH_DETECTED)
 
 keep_build_env ?= false
+patches ?=
 
 Q ?= @
 
@@ -97,6 +96,8 @@ create_build_dir:
 	$(Q)mkdir -p $(pkg_build_par_dir)
 create_fake_root_dir:
 	$(Q)mkdir -p $(pkg_fake_root_dir)
+create_fake_root_src_dir:
+	$(Q)mkdir -p $(pkg_fake_root_src_dir)
 create_repository_dir:
 	$(Q)mkdir -p $(repository_directory)/$(ARCH)
 
@@ -137,6 +138,18 @@ extract_tar.%:
 
 extract: create_build_dir extract_$(ext)
 	@echo "Extracting: done"
+
+#
+# Patching
+#
+
+$(patches):
+	@echo "Copying patch '$@' in $(pkg_build_par_dir)"
+	$(Q)cp $@ $(pkg_build_par_dir)
+	@echo "Applying patch '$@'"
+	$(Q)cd $(pkg_build_dir) && patch < ../$@
+
+patching: $(patches)
 
 #
 # Configure
@@ -206,7 +219,7 @@ fake_root_install: create_fake_root_dir pre_fake_root_install fake_root_install_
 #
 
 export name version release
-export URL description dependencies conflicts provides
+export URL description dependencies conflicts provides patches
 
 package_base = $(repository_directory)/$(ARCH)/$(name)-$(version)-r$(release).$(baguette_ext)
 package_base: $(package_base)
@@ -222,12 +235,18 @@ export pkg_fake_root_man_dir  = $(pkg_fake_root_dir)-man
 export pkg_fake_root_dev_dir  = $(pkg_fake_root_dir)-dev
 export pkg_fake_root_libs_dir = $(pkg_fake_root_dir)-libs
 
+extract_src_zip:
+	$(Q)cd $(pkg_fake_root_src_dir) && unzip $(tarball)
+extract_src_tar.%:
+	$(Q)cd $(pkg_fake_root_src_dir) && tar xf $(tarball)
+
 package_src = $(repository_directory)/$(ARCH)/$(name)-src-$(version)-r$(release).$(baguette_ext)
-package_src: $(package_src)
+package_src: create_fake_root_src_dir extract_src_$(ext) $(package_src)
 $(package_src):
-	@echo "Packaging $@ (work in progress)"
-	@#cd $(pkg_fake_root_dir) && create-split-src >> $(log_file).info 2>> $(log_file).err
-	@#cd $(pkg_fake_root_src_dir) && dependencies="" conflicts="" provides="" create-package $@ \
+	@echo "Packaging $@"
+	@-cd $(pkg_fake_root_src_dir) ; for F in `ls data* 2>/dev/null` ; do rm $F ; done; :
+	$(Q)cp -v $(patches) $(pkg_fake_root_src_dir)
+	$(Q)cd $(pkg_fake_root_src_dir) && dependencies="" conflicts="" provides="" create-package $@ \
 		 >> $(log_file).info 2>> $(log_file).err
 
 package_doc = $(repository_directory)/$(ARCH)/$(name)-doc-$(version)-r$(release).$(baguette_ext)
@@ -235,6 +254,7 @@ package_doc: $(package_doc)
 $(package_doc):
 	@echo "Packaging $@"
 	$(Q)cd $(pkg_fake_root_dir) && create-split-doc >> $(log_file).info 2>> $(log_file).err
+	@-cd $(pkg_fake_root_doc_dir) ; for F in `ls data* 2>/dev/null` ; do rm $F ; done; :
 	$(Q)cd $(pkg_fake_root_doc_dir) && dependencies="" conflicts="" provides="" create-package $@ \
 		>> $(log_file).info 2>> $(log_file).err
 
@@ -243,6 +263,7 @@ package_man: $(package_man)
 $(package_man):
 	@echo "Packaging $@"
 	$(Q)cd $(pkg_fake_root_dir) && create-split-man >> $(log_file).info 2>> $(log_file).err
+	@-cd $(pkg_fake_root_man_dir) ; for F in `ls data* 2>/dev/null` ; do rm $F ; done; :
 	$(Q)cd $(pkg_fake_root_man_dir) && dependencies="" conflicts="" provides="" create-package $@ \
 		>> $(log_file).info 2>> $(log_file).err
 
@@ -251,6 +272,7 @@ package_dev: $(package_dev)
 $(package_dev):
 	@echo "Packaging $@"
 	$(Q)cd $(pkg_fake_root_dir) && create-split-dev >> $(log_file).info 2>> $(log_file).err
+	@-cd $(pkg_fake_root_dev_dir) ; for F in `ls data* 2>/dev/null` ; do rm $F ; done; :
 	$(Q)cd $(pkg_fake_root_dev_dir) && dependencies="" conflicts="" provides="" create-package $@ \
 		>> $(log_file).info 2>> $(log_file).err
 
@@ -259,6 +281,7 @@ package_libs: $(package_libs)
 $(package_libs):
 	@echo "Packaging $@"
 	$(Q)cd $(pkg_fake_root_dir) && create-split-libs >> $(log_file).info 2>> $(log_file).err
+	@-cd $(pkg_fake_root_libs_dir) ; for F in `ls data* 2>/dev/null` ; do rm $F ; done; :
 	$(Q)cd $(pkg_fake_root_libs_dir) && dependencies="" conflicts="" provides="" create-package $@ \
 		>> $(log_file).info 2>> $(log_file).err
 
@@ -274,12 +297,13 @@ splits: package_src package_doc package_man package_dev package_libs
 # The main package is the last to be created since it includes
 # all content that wasn't matched by splits.
 packages: create_repository_dir splits package_base
-build-env: check_binaries download extract
+build-env: check_binaries download extract patching
 create: build-env configure build fake_root_install packages clean_working_dir
 
 
 # Targets not representing a file on the FS.
 .PHONY: check_binaries download* splits package* build-env \
+	$(patches) \
 	pre_* post_* configure* build* fake_root_install* create*
 
 # Ignoring errors on these targets.
