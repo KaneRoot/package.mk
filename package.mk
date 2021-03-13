@@ -33,22 +33,22 @@ CFLAGS = -Os -Wall
 # Options to pass to different build operations.
 CONFIGURE_OPTIONS_USER ?=
 CONFIGURE_OPTIONS ?= --disable-nls --without-gettext \
-					$(CONFIGURE_OPTIONS_USER)
+	--prefix=$(PREFIX) \
+	$(CONFIGURE_OPTIONS_USER)
 
 MAKE_OPTIONS_USER ?=
 MAKE_OPTIONS ?= CC=$(CC) CXX=$(CXX) \
-				"--prefix="$(PREFIX) \
-				$(MAKE_OPTIONS_USER)
+	$(MAKE_OPTIONS_USER)
 
 MAKE_INSTALL_OPTIONS_USER ?=
 MAKE_INSTALL_OPTIONS ?= DESTDIR=$(pkg_fake_root_dir) \
-						$(MAKE_INSTALL_OPTIONS_USER)
+	$(MAKE_INSTALL_OPTIONS_USER)
 
 CMAKE_OPTIONS_USER ?= 
 CMAKE_OPTIONS ?= "-DCMAKE_INSTALL_PREFIX="$(PREFIX) \
-				"-DCMAKE_BUILD_TYPE=Release" \
-				$(CMAKE_OPTIONS_USER) \
-				"-- -j"$(BUILD_CORES)
+	"-DCMAKE_BUILD_TYPE=Release" \
+	$(CMAKE_OPTIONS_USER) \
+	"-- -j"$(BUILD_CORES)
 
 PACKAGE_MANAGER ?= baguette # Available: baguette, apk
 
@@ -65,7 +65,7 @@ pkg_build_par_dir = $(pkg_working_dir)/build/
 pkg_build_dir     = $(pkg_build_par_dir)/$(name)-$(version)
 pkg_fake_root_dir = $(pkg_working_dir)/root
 
-log_file = $(WORKING_DIR)/$(UUID).log
+log_file = $(WORKING_DIR)/$(UUID)/log
 
 # shortcut
 bdir ?= $(pkg_build_dir)
@@ -92,18 +92,19 @@ pre_configure pre_build pre_fake_root_install post_fake_root_install:
 
 # Create directories
 create_source_dir:
-	mkdir -p $(tarballs_directory)
+	$(Q)mkdir -p $(tarballs_directory)
 create_build_dir:
-	mkdir -p $(pkg_build_par_dir)
-	mkdir -p $(pkg_fake_root_dir)
+	$(Q)mkdir -p $(pkg_build_par_dir)
+create_fake_root_dir:
+	$(Q)mkdir -p $(pkg_fake_root_dir)
 create_repository_dir:
-	mkdir -p $(repository_directory)/$(ARCH)
+	$(Q)mkdir -p $(repository_directory)/$(ARCH)
 
 # Clean directories
 clean_build_dir:
-	$(keep_build_env) || rm -rf $(pkg_build_par_dir)
+	$(Q)$(keep_build_env) || rm -rf $(pkg_build_par_dir)
 clean_working_dir:
-	$(keep_build_env) || rm -rf $(pkg_working_dir)
+	$(Q)$(keep_build_env) || rm -rf $(pkg_working_dir)
 
 #
 # Download sources
@@ -112,15 +113,15 @@ clean_working_dir:
 tarball = $(tarballs_directory)/$(name)-$(version).$(ext)
 
 # Backends: ftp and wget
-launch_download_ftp:
+download_ftp:
 	@   [ -f $(tarball) ] || echo ftp -O $(tarball) $(URL)
 	$(Q)[ -f $(tarball) ] || ftp -O $(tarball) $(URL)
-launch_download_wget:
+download_wget:
 	@   [ -f $(tarball) ] || echo wget -O $(tarball) $(URL)
 	$(Q)[ -f $(tarball) ] || wget -O $(tarball) $(URL)
 
 # How to create the file (download).
-$(tarball): launch_download_$(download_tool)
+$(tarball): download_$(download_tool)
 	@echo download of $@ done
 
 download: create_source_dir $(tarball)
@@ -130,10 +131,8 @@ download: create_source_dir $(tarball)
 #
 
 extract_zip:
-	@echo "cd $(pkg_build_par_dir) && unzip $(tarball)"
 	$(Q)cd $(pkg_build_par_dir) && unzip $(tarball)
 extract_tar.%:
-	@echo "cd $(pkg_build_par_dir) && tar xf $(tarball)"
 	$(Q)cd $(pkg_build_par_dir) && tar xf $(tarball)
 
 extract: create_build_dir extract_$(ext)
@@ -145,23 +144,23 @@ extract: create_build_dir extract_$(ext)
 
 # Both will be run in case there is no user-defined configure.
 configure_autotools:
-	@echo "Configure: autotools"
 	$(Q)[ -f $(bdir)/configure ] && ( \
 			cd $(bdir); \
 			echo `pwd` "$$ ./configure $(CONFIGURE_OPTIONS)"; \
-			./configure $(CONFIGURE_OPTIONS); \
+			echo `pwd` "$$ ./configure $(CONFIGURE_OPTIONS)" >> $(log_file).info; \
+			./configure $(CONFIGURE_OPTIONS) >> $(log_file).info 2>> $(log_file).err; \
 		) || ( \
-			echo "no configure script - pass" \
+			echo "no configure script - pass autotools backend" \
 		)
 
 configure_cmake:
-	@echo "Configure: cmake"
 	$(Q)[ -f $(bdir)/CMakeLists.txt ] && ( \
 			cd $(bdir); \
 			echo `pwd` "$$ cmake . $(CMAKE_OPTIONS)"; \
-			cmake . $(CMAKE_OPTIONS); \
+			echo `pwd` "$$ cmake . $(CMAKE_OPTIONS)" >> $(log_file).info; \
+			cmake . $(CMAKE_OPTIONS) >> $(log_file).info 2>> $(log_file).err; \
 		) || ( \
-			echo "no CMakeLists.txt - pass" \
+			echo "no CMakeLists.txt - pass cmake backend" \
 		)
 
 configure: pre_configure configure_autotools configure_cmake
@@ -172,11 +171,11 @@ configure: pre_configure configure_autotools configure_cmake
 #
 
 build_make:
-	@echo "Build: make"
 	$(Q)[ -f $(bdir)/Makefile ] && ( \
 			cd $(bdir); \
 			echo `pwd` "$$ make $(MAKE_OPTIONS)"; \
-			make $(MAKE_OPTIONS); \
+			echo `pwd` "$$ make $(MAKE_OPTIONS)" >> $(log_file).info; \
+			make $(MAKE_OPTIONS) >> $(log_file).info 2>> $(log_file).err; \
 		) || ( \
 			echo "no Makefile - pass" \
 		)
@@ -189,16 +188,16 @@ build: pre_build build_make
 #
 
 fake_root_install_make:
-	@echo "Install (fake root): make"
 	$(Q)[ -f $(bdir)/Makefile ] && ( \
 			cd $(bdir); \
 			echo `pwd` "$$ make install $(MAKE_INSTALL_OPTIONS)"; \
-			make install $(MAKE_INSTALL_OPTIONS); \
+			echo `pwd` "$$ make install $(MAKE_INSTALL_OPTIONS)" >> $(log_file).info; \
+			make install $(MAKE_INSTALL_OPTIONS) >> $(log_file).info 2>> $(log_file).err; \
 		) || ( \
 			echo "no Makefile - pass" \
 		)
 
-fake_root_install: pre_fake_root_install fake_root_install_make post_fake_root_install
+fake_root_install: create_fake_root_dir pre_fake_root_install fake_root_install_make post_fake_root_install
 	@echo "Install (fake root): done"
 
 
@@ -214,8 +213,8 @@ package_base: $(package_base)
 $(package_base):
 	@echo "Packaging $@"
 	@# strip binaries
-	cd $(pkg_fake_root_dir) && find . -type f | while read F ; do strip $F 2>/dev/null ; done ; :
-	cd $(pkg_fake_root_dir) && create-package $@
+	$(Q)cd $(pkg_fake_root_dir) && find . -type f | while read F ; do strip $F 2>/dev/null ; done ; :
+	$(Q)cd $(pkg_fake_root_dir) && create-package $@ >> $(log_file).info 2>> $(log_file).err
 
 export pkg_fake_root_src_dir  = $(pkg_fake_root_dir)-src
 export pkg_fake_root_doc_dir  = $(pkg_fake_root_dir)-doc
@@ -227,59 +226,60 @@ package_src = $(repository_directory)/$(ARCH)/$(name)-src-$(version)-r$(release)
 package_src: $(package_src)
 $(package_src):
 	@echo "Packaging $@ (work in progress)"
-	@#cd $(pkg_fake_root_dir) && create-split-src
-	@#cd $(pkg_fake_root_src_dir) && dependencies="" conflicts="" provides="" create-package $@
+	@#cd $(pkg_fake_root_dir) && create-split-src >> $(log_file).info 2>> $(log_file).err
+	@#cd $(pkg_fake_root_src_dir) && dependencies="" conflicts="" provides="" create-package $@ \
+		 >> $(log_file).info 2>> $(log_file).err
 
 package_doc = $(repository_directory)/$(ARCH)/$(name)-doc-$(version)-r$(release).$(baguette_ext)
 package_doc: $(package_doc)
 $(package_doc):
 	@echo "Packaging $@"
-	cd $(pkg_fake_root_dir) && create-split-doc
-	cd $(pkg_fake_root_doc_dir) && dependencies="" conflicts="" provides="" create-package $@
+	$(Q)cd $(pkg_fake_root_dir) && create-split-doc >> $(log_file).info 2>> $(log_file).err
+	$(Q)cd $(pkg_fake_root_doc_dir) && dependencies="" conflicts="" provides="" create-package $@ \
+		>> $(log_file).info 2>> $(log_file).err
 
 package_man = $(repository_directory)/$(ARCH)/$(name)-man-$(version)-r$(release).$(baguette_ext)
 package_man: $(package_man)
 $(package_man):
 	@echo "Packaging $@"
-	cd $(pkg_fake_root_dir) && create-split-man
-	cd $(pkg_fake_root_man_dir) && dependencies="" conflicts="" provides="" create-package $@
+	$(Q)cd $(pkg_fake_root_dir) && create-split-man >> $(log_file).info 2>> $(log_file).err
+	$(Q)cd $(pkg_fake_root_man_dir) && dependencies="" conflicts="" provides="" create-package $@ \
+		>> $(log_file).info 2>> $(log_file).err
 
 package_dev = $(repository_directory)/$(ARCH)/$(name)-dev-$(version)-r$(release).$(baguette_ext)
 package_dev: $(package_dev)
 $(package_dev):
 	@echo "Packaging $@"
-	cd $(pkg_fake_root_dir) && create-split-dev
-	cd $(pkg_fake_root_dev_dir) && dependencies="" conflicts="" provides="" create-package $@
+	$(Q)cd $(pkg_fake_root_dir) && create-split-dev >> $(log_file).info 2>> $(log_file).err
+	$(Q)cd $(pkg_fake_root_dev_dir) && dependencies="" conflicts="" provides="" create-package $@ \
+		>> $(log_file).info 2>> $(log_file).err
 
 package_libs = $(repository_directory)/$(ARCH)/$(name)-libs-$(version)-r$(release).$(baguette_ext)
 package_libs: $(package_libs)
 $(package_libs):
 	@echo "Packaging $@"
-	cd $(pkg_fake_root_dir) && create-split-libs
-	cd $(pkg_fake_root_libs_dir) && dependencies="" conflicts="" provides="" create-package $@
+	$(Q)cd $(pkg_fake_root_dir) && create-split-libs >> $(log_file).info 2>> $(log_file).err
+	$(Q)cd $(pkg_fake_root_libs_dir) && dependencies="" conflicts="" provides="" create-package $@ \
+		>> $(log_file).info 2>> $(log_file).err
 
 
-check_binaries_wget_or_ftp:
-	@which ftp || which wget
-check_binaries_tar:
-	@which tar && which xz
-check_binaries_zip:
-	@which unzip
-check_binaries: check_binaries_wget_or_ftp check_binaries_tar check_binaries_zip
+check_binaries:
+	@echo "Checking for required binaries (ftp or wget, tar & xz, unzip, zstd, strip)"
+	@which ftp >/dev/null || which wget >/dev/null
+	@which tar >/dev/null && which xz >/dev/null
+	@which unzip zstd strip >/dev/null
+	@echo "Checking for required binaries (ftp or wget, tar & xz, unzip, zstd, strip): done"
 
 splits: package_src package_doc package_man package_dev package_libs
 # The main package is the last to be created since it includes
 # all content that wasn't matched by splits.
 packages: create_repository_dir splits package_base
-getting-build-env: check_binaries download extract
-create: getting-build-env configure build fake_root_install packages clean_working_dir
+build-env: check_binaries download extract
+create: build-env configure build fake_root_install packages clean_working_dir
 
 
 # Targets not representing a file on the FS.
-.PHONY: download \
-	launch_download_* \
-	splits package* \
-	check_binaries \
+.PHONY: check_binaries download* splits package* build-env \
 	pre_* post_* configure* build* fake_root_install* create*
 
 # Ignoring errors on these targets.
