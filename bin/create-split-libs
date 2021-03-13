@@ -1,0 +1,9 @@
+#!/bin/sh
+
+. $(dirname $(which create-split-man))/create-split.subr
+
+# Usage: create-split-libs
+
+# For library split, move .a files (static libraries).
+
+create_split ${pkg_fake_root_libs_dir} "\.a$"

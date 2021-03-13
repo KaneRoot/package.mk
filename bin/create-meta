@@ -1,0 +1,20 @@
+#!/bin/sh
+
+du_sk=`du -sk . | sed "s/[ \t].*//g"`
+size=$(echo "$du_sk * 1024" | bc)
+
+cat <<END
+name = $name
+version = $version
+release = $release
+
+size = $size
+slot = $SLOT
+
+url = $URL
+description = $description
+
+dependencies = $dependencies
+conflicts = $conflicts
+provides = $provides
+END

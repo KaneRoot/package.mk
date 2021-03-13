@@ -1,0 +1,10 @@
+#!/bin/sh
+
+. $(dirname $(which create-split-man))/create-split.subr
+
+# Usage: create-split-man
+
+# For manuals, move any file or directory matching
+# "/share/man"
+
+create_split ${pkg_fake_root_man_dir} "/share/man"

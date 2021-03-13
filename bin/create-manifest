@@ -1,0 +1,13 @@
+#!/bin/sh
+
+find . | while read F ; do
+	if [ -f $F ]; then
+		sum=$(sha256sum $F | cut -d ' ' -f 1)
+		echo "f:$F:$sum"
+	elif [ -d $F ]; then
+		echo "d:$F"
+	else
+		# Don't know the type, could be a problem
+		exit 1
+	fi
+done

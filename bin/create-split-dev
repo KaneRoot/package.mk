@@ -1,0 +1,11 @@
+#!/bin/sh
+
+. $(dirname $(which create-split-dev))/create-split.subr
+
+# Usage: create-split-dev
+
+# dev split package targets developers content, which means
+# - /include/ and /pkgconfig/ directories
+# - .h and .hpp files
+
+create_split ${pkg_fake_root_dev_dir} "(/pkgconfig|/include|\.h|\.hpp)$"

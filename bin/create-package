@@ -1,0 +1,10 @@
+#!/bin/sh
+
+package=$1
+
+tar cvf data.tar .
+zstd --ultra data.tar
+rm data.tar
+create-manifest > package-manifest
+create-meta > package-info
+tar cvf $package package-manifest package-info data.tar.zst

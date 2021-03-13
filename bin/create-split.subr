@@ -1,0 +1,31 @@
+#!/bin/sh
+
+move_content(){
+	new_root=$1
+	content=$2
+
+	# Recreate the whole path into the new directory.
+	new_dir="${new_root}/$(dirname $content)"
+	[ -d "${new_dir}" ] || (
+		echo mkdir -p "${new_dir}"
+		mkdir -p "${new_dir}"
+	)
+	mv -v "${content}" "${new_dir}"
+}
+
+# usage: create_split new_root regex [regex...]
+create_split(){
+	new_root=$1 ; shift
+
+	find . | while read F; do
+		if [ -e "${F}" ]; then
+			for regex in $* ; do
+				echo $F | grep -E "${regex}" >/dev/null 2>/dev/null
+				if [ $? -eq 0 ] ; then
+					move_content "${new_root}" "${F}"
+				fi
+				: # Do not end the function with a potential error.
+			done
+		fi
+	done
+}

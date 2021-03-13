@@ -65,7 +65,7 @@ pkg_build_par_dir = $(pkg_working_dir)/build/
 pkg_build_dir     = $(pkg_build_par_dir)/$(name)-$(version)
 pkg_fake_root_dir = $(pkg_working_dir)/root
 
-pkg_working_log = $(WORKING_DIR)/$(UUID).log
+log_file = $(WORKING_DIR)/$(UUID).log
 
 # shortcut
 bdir ?= $(pkg_build_dir)
@@ -84,7 +84,7 @@ download_tool ?= wget
 #
 
 pre_configure pre_build pre_fake_root_install post_fake_root_install:
-	@echo $@ => do nothing
+	@echo "$@ => do nothing"
 
 #
 # Misc
@@ -96,8 +96,9 @@ create_source_dir:
 create_build_dir:
 	mkdir -p $(pkg_build_par_dir)
 	mkdir -p $(pkg_fake_root_dir)
+create_repository_dir:
+	mkdir -p $(repository_directory)/$(ARCH)
 
-# TODO: use these targets
 # Clean directories
 clean_build_dir:
 	$(keep_build_env) || rm -rf $(pkg_build_par_dir)
@@ -212,40 +213,50 @@ package_base = $(repository_directory)/$(ARCH)/$(name)-$(version)-r$(release).$(
 package_base: $(package_base)
 $(package_base):
 	@echo "Packaging $@"
+	@# strip binaries
+	cd $(pkg_fake_root_dir) && find . -type f | while read F ; do strip $F 2>/dev/null ; done ; :
 	cd $(pkg_fake_root_dir) && create-package $@
 
-pkg_fake_root_src_dir = $(pkg_fake_root_dir)-src
-pkg_fake_root_man_dir = $(pkg_fake_root_dir)-man
-pkg_fake_root_dev_dir = $(pkg_fake_root_dir)-dev
-pkg_fake_root_doc_dir = $(pkg_fake_root_dir)-doc
+export pkg_fake_root_src_dir  = $(pkg_fake_root_dir)-src
+export pkg_fake_root_doc_dir  = $(pkg_fake_root_dir)-doc
+export pkg_fake_root_man_dir  = $(pkg_fake_root_dir)-man
+export pkg_fake_root_dev_dir  = $(pkg_fake_root_dir)-dev
+export pkg_fake_root_libs_dir = $(pkg_fake_root_dir)-libs
 
-# src split
 package_src = $(repository_directory)/$(ARCH)/$(name)-src-$(version)-r$(release).$(baguette_ext)
 package_src: $(package_src)
 $(package_src):
-	@echo "Packaging $@"
-	cd $(pkg_fake_root_src_dir) && dependencies="" conflicts="" provides="" create-package $@
+	@echo "Packaging $@ (work in progress)"
+	@#cd $(pkg_fake_root_dir) && create-split-src
+	@#cd $(pkg_fake_root_src_dir) && dependencies="" conflicts="" provides="" create-package $@
 
-# doc split
 package_doc = $(repository_directory)/$(ARCH)/$(name)-doc-$(version)-r$(release).$(baguette_ext)
 package_doc: $(package_doc)
 $(package_doc):
 	@echo "Packaging $@"
-	cd $(pkg_fake_root_src_dir) && dependencies="" conflicts="" provides="" create-package $@
+	cd $(pkg_fake_root_dir) && create-split-doc
+	cd $(pkg_fake_root_doc_dir) && dependencies="" conflicts="" provides="" create-package $@
 
-# man split
 package_man = $(repository_directory)/$(ARCH)/$(name)-man-$(version)-r$(release).$(baguette_ext)
 package_man: $(package_man)
 $(package_man):
 	@echo "Packaging $@"
-	cd $(pkg_fake_root_src_dir) && dependencies="" conflicts="" provides="" create-package $@
+	cd $(pkg_fake_root_dir) && create-split-man
+	cd $(pkg_fake_root_man_dir) && dependencies="" conflicts="" provides="" create-package $@
 
-# dev split
 package_dev = $(repository_directory)/$(ARCH)/$(name)-dev-$(version)-r$(release).$(baguette_ext)
 package_dev: $(package_dev)
 $(package_dev):
 	@echo "Packaging $@"
-	cd $(pkg_fake_root_src_dir) && dependencies="" conflicts="" provides="" create-package $@
+	cd $(pkg_fake_root_dir) && create-split-dev
+	cd $(pkg_fake_root_dev_dir) && dependencies="" conflicts="" provides="" create-package $@
+
+package_libs = $(repository_directory)/$(ARCH)/$(name)-libs-$(version)-r$(release).$(baguette_ext)
+package_libs: $(package_libs)
+$(package_libs):
+	@echo "Packaging $@"
+	cd $(pkg_fake_root_dir) && create-split-libs
+	cd $(pkg_fake_root_libs_dir) && dependencies="" conflicts="" provides="" create-package $@
 
 
 check_binaries_wget_or_ftp:
@@ -256,9 +267,12 @@ check_binaries_zip:
 	@which unzip
 check_binaries: check_binaries_wget_or_ftp check_binaries_tar check_binaries_zip
 
-splits: package_src package_doc package_man package_dev package_base
+splits: package_src package_doc package_man package_dev package_libs
+# The main package is the last to be created since it includes
+# all content that wasn't matched by splits.
+packages: create_repository_dir splits package_base
 getting-build-env: check_binaries download extract
-create: getting-build-env configure build fake_root_install splits clean_working_dir
+create: getting-build-env configure build fake_root_install packages clean_working_dir
 
 
 # Targets not representing a file on the FS.
