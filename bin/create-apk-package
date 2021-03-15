@@ -1,0 +1,51 @@
+#!/usr/bin/env sh
+
+# This script creates:
+# - a control.tar.gz containing the .PKGINFO file
+# - compressed data in the file 'data.tar.gz'
+# - a signature file
+#   remember to create your own RSA keys with "abuild-keygen -a"
+# - the final .apk package
+
+msg(){
+	echo -e "\e[31m>>\e[0m $*"
+}
+
+apk="$1"
+gzip="gzip"
+
+set -e
+
+# (in case of multiple runs of this script within the same directory)
+sed "/datahash =/d" .PKGINFO  > .PKGINFO.new
+mv .PKGINFO.new .PKGINFO
+
+# data.tar.gz
+set -- *
+
+SOURCE_DATE_EPOCH=$(date -u "+%s")
+# normalize timestamps
+find . -exec touch -h -d "@$SOURCE_DATE_EPOCH" {} +
+
+file_list=$(ls | grep -vE "(data.*|control.*)")
+tar --xattrs -f - -c ${file_list} | abuild-tar --hash | $gzip -9 >data.tar.gz
+
+msg "Create checksum..."
+# append the hash for data.tar.gz
+sha256=$(sha256sum data.tar.gz | cut -f1 -d' ')
+echo "datahash = $sha256" >> .PKGINFO
+
+# control.tar.gz
+tar \
+	--format=posix \
+	--pax-option=exthdr.name=%d/PaxHeaders/%f,atime:=0,ctime:=0 \
+	--mtime="@${SOURCE_DATE_EPOCH}" \
+	-f - -c .PKGINFO | abuild-tar --cut \
+	| $gzip -n -9 > control.tar.gz
+abuild-sign -q control.tar.gz || exit 1
+
+msg "Create $apk"
+cat control.tar.gz data.tar.gz > $apk
+
+rm data.* 2>/dev/null || :
+rm control.* 2>/dev/null || :

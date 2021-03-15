@@ -1,5 +1,9 @@
 # Preferences, default environment.
 
+# TODO:
+# - install build dependencies
+# - chroot build
+
 # Used by default for working directory and log file names
 gen_uuid != uuidgen
 
@@ -20,6 +24,8 @@ keep_build_env ?= false
 patches ?=
 
 Q ?= @
+
+JOBS ?= 1
 
 release ?= 0
 
@@ -47,11 +53,7 @@ CMAKE_OPTIONS_USER ?=
 CMAKE_OPTIONS ?= "-DCMAKE_INSTALL_PREFIX="$(PREFIX) \
 	"-DCMAKE_BUILD_TYPE=Release" \
 	$(CMAKE_OPTIONS_USER) \
-	"-- -j"$(BUILD_CORES)
-
-PACKAGE_MANAGER ?= baguette # Available: baguette, apk
-
-BUILD_CORES ?= 1
+	"-- -j"$(JOBS)
 
 tarballs_directory   = /tmp/src# where to store package sources
 repository_directory = /tmp/pkg# local package repository
@@ -73,7 +75,14 @@ bdir ?= $(pkg_build_dir)
 auto_ext != echo $(URL) | grep -oE "(zip|tar.xz|tar.gz)$$"
 ext ?= $(auto_ext)
 
-baguette_ext := baguette
+
+PACKAGE_MANAGER ?= baguette # Available: baguette, apk
+export PACKAGE_MANAGER
+
+package_ext := baguette
+ifeq ($(PACKAGE_MANAGER), apk)
+package_ext := apk
+endif
 
 download_tool ?= wget
 
@@ -221,7 +230,7 @@ fake_root_install: create_fake_root_dir pre_fake_root_install fake_root_install_
 export name version release
 export URL description dependencies conflicts provides patches
 
-package_base = $(repository_directory)/$(ARCH)/$(name)-$(version)-r$(release).$(baguette_ext)
+package_base = $(repository_directory)/$(ARCH)/$(name)-$(version)-r$(release).$(package_ext)
 package_base: $(package_base)
 $(package_base):
 	@echo "Packaging $@"
@@ -240,57 +249,70 @@ extract_src_zip:
 extract_src_tar.%:
 	$(Q)cd $(pkg_fake_root_src_dir) && tar xf $(tarball)
 
-package_src = $(repository_directory)/$(ARCH)/$(name)-src-$(version)-r$(release).$(baguette_ext)
+package_src = $(repository_directory)/$(ARCH)/$(name)-src-$(version)-r$(release).$(package_ext)
 package_src: create_fake_root_src_dir extract_src_$(ext) $(package_src)
 $(package_src):
 	@echo "Packaging $@"
 	@-cd $(pkg_fake_root_src_dir) ; for F in `ls data* 2>/dev/null` ; do rm $F ; done; :
-	$(Q)cp -v $(patches) $(pkg_fake_root_src_dir)
+	$(Q)[ ! -z "$(patches)" ] && cp -v $(patches) $(pkg_fake_root_src_dir) || :
 	$(Q)cd $(pkg_fake_root_src_dir) && dependencies="" conflicts="" provides="" create-package $@ \
 		 >> $(log_file).info 2>> $(log_file).err
 
-package_doc = $(repository_directory)/$(ARCH)/$(name)-doc-$(version)-r$(release).$(baguette_ext)
+package_doc = $(repository_directory)/$(ARCH)/$(name)-doc-$(version)-r$(release).$(package_ext)
 package_doc: $(package_doc)
 $(package_doc):
 	@echo "Packaging $@"
 	$(Q)cd $(pkg_fake_root_dir) && create-split-doc >> $(log_file).info 2>> $(log_file).err
-	@-cd $(pkg_fake_root_doc_dir) ; for F in `ls data* 2>/dev/null` ; do rm $F ; done; :
-	$(Q)cd $(pkg_fake_root_doc_dir) && dependencies="" conflicts="" provides="" create-package $@ \
-		>> $(log_file).info 2>> $(log_file).err
+	$(Q)[ -d "$(pkg_fake_root_doc_dir)" ] && ( \
+		cd $(pkg_fake_root_doc_dir) ; \
+		for F in `ls data* 2>/dev/null` ; do rm $F ; done; : ; \
+		dependencies="" conflicts="" provides="" create-package $@ \
+		>> $(log_file).info 2>> $(log_file).err \
+	) ; :
 
-package_man = $(repository_directory)/$(ARCH)/$(name)-man-$(version)-r$(release).$(baguette_ext)
+package_man = $(repository_directory)/$(ARCH)/$(name)-man-$(version)-r$(release).$(package_ext)
 package_man: $(package_man)
 $(package_man):
 	@echo "Packaging $@"
 	$(Q)cd $(pkg_fake_root_dir) && create-split-man >> $(log_file).info 2>> $(log_file).err
-	@-cd $(pkg_fake_root_man_dir) ; for F in `ls data* 2>/dev/null` ; do rm $F ; done; :
-	$(Q)cd $(pkg_fake_root_man_dir) && dependencies="" conflicts="" provides="" create-package $@ \
-		>> $(log_file).info 2>> $(log_file).err
+	$(Q)[ -d "$(pkg_fake_root_man_dir)" ] && ( \
+		cd $(pkg_fake_root_man_dir) ; \
+		for F in `ls data* 2>/dev/null` ; do rm $F ; done; : ; \
+		dependencies="" conflicts="" provides="" create-package $@ \
+		>> $(log_file).info 2>> $(log_file).err \
+	) ; :
 
-package_dev = $(repository_directory)/$(ARCH)/$(name)-dev-$(version)-r$(release).$(baguette_ext)
+package_dev = $(repository_directory)/$(ARCH)/$(name)-dev-$(version)-r$(release).$(package_ext)
 package_dev: $(package_dev)
 $(package_dev):
 	@echo "Packaging $@"
 	$(Q)cd $(pkg_fake_root_dir) && create-split-dev >> $(log_file).info 2>> $(log_file).err
-	@-cd $(pkg_fake_root_dev_dir) ; for F in `ls data* 2>/dev/null` ; do rm $F ; done; :
-	$(Q)cd $(pkg_fake_root_dev_dir) && dependencies="" conflicts="" provides="" create-package $@ \
-		>> $(log_file).info 2>> $(log_file).err
+	$(Q)[ -d "$(pkg_fake_root_dev_dir)" ] && ( \
+		cd $(pkg_fake_root_dev_dir) ; \
+		for F in `ls data* 2>/dev/null` ; do rm $F ; done; : ; \
+		dependencies="" conflicts="" provides="" create-package $@ \
+		>> $(log_file).info 2>> $(log_file).err \
+	) ; :
 
-package_libs = $(repository_directory)/$(ARCH)/$(name)-libs-$(version)-r$(release).$(baguette_ext)
+package_libs = $(repository_directory)/$(ARCH)/$(name)-libs-$(version)-r$(release).$(package_ext)
 package_libs: $(package_libs)
 $(package_libs):
 	@echo "Packaging $@"
 	$(Q)cd $(pkg_fake_root_dir) && create-split-libs >> $(log_file).info 2>> $(log_file).err
-	@-cd $(pkg_fake_root_libs_dir) ; for F in `ls data* 2>/dev/null` ; do rm $F ; done; :
-	$(Q)cd $(pkg_fake_root_libs_dir) && dependencies="" conflicts="" provides="" create-package $@ \
-		>> $(log_file).info 2>> $(log_file).err
+	$(Q)[ -d "$(pkg_fake_root_libs_dir)" ] && ( \
+		cd $(pkg_fake_root_libs_dir) ; \
+		for F in `ls data* 2>/dev/null` ; do rm $F ; done; : ; \
+		dependencies="" conflicts="" provides="" create-package $@ \
+		>> $(log_file).info 2>> $(log_file).err \
+	) ; :
 
 
 check_binaries:
 	@echo "Checking for required binaries (ftp or wget, tar & xz, unzip, zstd, strip)"
-	@which ftp >/dev/null || which wget >/dev/null
-	@which tar >/dev/null && which xz >/dev/null
-	@which unzip zstd strip >/dev/null
+	which ftp >/dev/null || which wget >/dev/null
+	which tar >/dev/null && which xz >/dev/null
+	which unzip zstd strip >/dev/null
+	[ $(PACKAGE_MANAGER) = "apk" ] && which abuild-sign abuild-tar >/dev/null || :
 	@echo "Checking for required binaries (ftp or wget, tar & xz, unzip, zstd, strip): done"
 
 splits: package_src package_doc package_man package_dev package_libs

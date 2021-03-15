@@ -2,9 +2,29 @@
 
 package=$1
 
-tar cvf data.tar .
-zstd --ultra data.tar
-rm data.tar
-create-manifest > package-manifest
-create-meta > package-info
-tar cvf $package package-manifest package-info data.tar.zst
+# These functions transform the current directory into a full-blown baguette or apk package.
+baguette(){
+	package=$1
+
+	tar cvf data.tar .
+	zstd --ultra data.tar
+	rm data.tar
+	create-manifest > package-manifest
+	create-meta > package-info
+	tar cvf $package package-manifest package-info data.tar.zst
+}
+
+apk(){
+	create-apk-pkginfo
+	create-apk-package $1
+}
+
+case x-$PACKAGE_MANAGER in
+	x-baguette) echo "Create Baguette package '${package}'" ; baguette "${package}" ;;
+	x-apk)      echo "Create apk package '${package}'"      ; apk      "${package}" ;;
+	x-*)
+		echo "package manager '${PACKAGE_MANAGER}' not recognized" 1>&2
+		exit 1
+		;;
+esac
+
