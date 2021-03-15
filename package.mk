@@ -31,9 +31,10 @@ release ?= 0
 
 export SLOT PREFIX BINDIR LIBDIR SHAREDIR INCLUDEDIR MANDIR
 
-CC = clang
-CXX = clang++
-CFLAGS = -Os -Wall
+CC ?= clang
+CXX ?= clang++
+CFLAGS_USER ?=
+CFLAGS ?= -Os -Wall $(CFLAGS_USER)
 
 # Options to pass to different build operations.
 CONFIGURE_OPTIONS_USER ?=
@@ -42,7 +43,7 @@ CONFIGURE_OPTIONS ?= --disable-nls --without-gettext \
 	$(CONFIGURE_OPTIONS_USER)
 
 MAKE_OPTIONS_USER ?=
-MAKE_OPTIONS ?= CC=$(CC) CXX=$(CXX) \
+MAKE_OPTIONS ?= CC=$(CC) CXX=$(CXX) -j$(JOBS) \
 	$(MAKE_OPTIONS_USER)
 
 MAKE_INSTALL_OPTIONS_USER ?=
@@ -50,10 +51,10 @@ MAKE_INSTALL_OPTIONS ?= DESTDIR=$(pkg_fake_root_dir) \
 	$(MAKE_INSTALL_OPTIONS_USER)
 
 CMAKE_OPTIONS_USER ?= 
-CMAKE_OPTIONS ?= "-DCMAKE_INSTALL_PREFIX="$(PREFIX) \
-	"-DCMAKE_BUILD_TYPE=Release" \
+CMAKE_OPTIONS ?= -DCMAKE_INSTALL_PREFIX=$(PREFIX) \
+	-DCMAKE_BUILD_TYPE=Release \
 	$(CMAKE_OPTIONS_USER) \
-	"-- -j"$(JOBS)
+	-- -j$(JOBS)
 
 tarballs_directory   = /tmp/src# where to store package sources
 repository_directory = /tmp/pkg# local package repository
@@ -72,7 +73,7 @@ log_file = $(WORKING_DIR)/$(UUID)/log
 bdir ?= $(pkg_build_dir)
 
 # Automatic process of the file extension.
-auto_ext != echo $(URL) | grep -oE "(zip|tar.xz|tar.gz)$$"
+auto_ext != echo $(URL) | grep -oE "(zip|tar.xz|tar.bz2|tar.gz)$$"
 ext ?= $(auto_ext)
 
 
@@ -166,24 +167,24 @@ patching: $(patches)
 
 # Both will be run in case there is no user-defined configure.
 configure_autotools:
-	$(Q)[ -f $(bdir)/configure ] && ( \
+	$(Q)if [ -f $(bdir)/configure ]; then \
 			cd $(bdir); \
 			echo `pwd` "$$ ./configure $(CONFIGURE_OPTIONS)"; \
 			echo `pwd` "$$ ./configure $(CONFIGURE_OPTIONS)" >> $(log_file).info; \
 			./configure $(CONFIGURE_OPTIONS) >> $(log_file).info 2>> $(log_file).err; \
-		) || ( \
-			echo "no configure script - pass autotools backend" \
-		)
+		else \
+			echo "no configure script - pass autotools backend"; \
+		fi
 
 configure_cmake:
-	$(Q)[ -f $(bdir)/CMakeLists.txt ] && ( \
+	$(Q)if [ -f $(bdir)/CMakeLists.txt ]; then \
 			cd $(bdir); \
 			echo `pwd` "$$ cmake . $(CMAKE_OPTIONS)"; \
 			echo `pwd` "$$ cmake . $(CMAKE_OPTIONS)" >> $(log_file).info; \
 			cmake . $(CMAKE_OPTIONS) >> $(log_file).info 2>> $(log_file).err; \
-		) || ( \
-			echo "no CMakeLists.txt - pass cmake backend" \
-		)
+		else \
+			echo "no CMakeLists.txt - pass cmake backend" ; \
+		fi
 
 configure: pre_configure configure_autotools configure_cmake
 	@echo "Configure: done"
@@ -193,14 +194,14 @@ configure: pre_configure configure_autotools configure_cmake
 #
 
 build_make:
-	$(Q)[ -f $(bdir)/Makefile ] && ( \
+	$(Q)if [ -f $(bdir)/Makefile ]; then \
 			cd $(bdir); \
 			echo `pwd` "$$ make $(MAKE_OPTIONS)"; \
 			echo `pwd` "$$ make $(MAKE_OPTIONS)" >> $(log_file).info; \
 			make $(MAKE_OPTIONS) >> $(log_file).info 2>> $(log_file).err; \
-		) || ( \
-			echo "no Makefile - pass" \
-		)
+		else \
+			echo "no Makefile - pass" ; \
+		fi
 
 build: pre_build build_make
 	@echo "Build: done"
@@ -253,7 +254,6 @@ package_src = $(repository_directory)/$(ARCH)/$(name)-src-$(version)-r$(release)
 package_src: create_fake_root_src_dir extract_src_$(ext) $(package_src)
 $(package_src):
 	@echo "Packaging $@"
-	@-cd $(pkg_fake_root_src_dir) ; for F in `ls data* 2>/dev/null` ; do rm $F ; done; :
 	$(Q)[ ! -z "$(patches)" ] && cp -v $(patches) $(pkg_fake_root_src_dir) || :
 	$(Q)cd $(pkg_fake_root_src_dir) && dependencies="" conflicts="" provides="" create-package $@ \
 		 >> $(log_file).info 2>> $(log_file).err
@@ -263,48 +263,52 @@ package_doc: $(package_doc)
 $(package_doc):
 	@echo "Packaging $@"
 	$(Q)cd $(pkg_fake_root_dir) && create-split-doc >> $(log_file).info 2>> $(log_file).err
-	$(Q)[ -d "$(pkg_fake_root_doc_dir)" ] && ( \
+	$(Q)if [ -d "$(pkg_fake_root_doc_dir)" ] ; then \
 		cd $(pkg_fake_root_doc_dir) ; \
-		for F in `ls data* 2>/dev/null` ; do rm $F ; done; : ; \
 		dependencies="" conflicts="" provides="" create-package $@ \
-		>> $(log_file).info 2>> $(log_file).err \
-	) ; :
+		>> $(log_file).info 2>> $(log_file).err ; \
+	else \
+		echo -e "\033[0;35;40m>> no '$(pkg_fake_root_doc_dir)' directory\033[0m" ; \
+	fi
 
 package_man = $(repository_directory)/$(ARCH)/$(name)-man-$(version)-r$(release).$(package_ext)
 package_man: $(package_man)
 $(package_man):
 	@echo "Packaging $@"
 	$(Q)cd $(pkg_fake_root_dir) && create-split-man >> $(log_file).info 2>> $(log_file).err
-	$(Q)[ -d "$(pkg_fake_root_man_dir)" ] && ( \
+	$(Q)if [ -d "$(pkg_fake_root_man_dir)" ] ; then \
 		cd $(pkg_fake_root_man_dir) ; \
-		for F in `ls data* 2>/dev/null` ; do rm $F ; done; : ; \
 		dependencies="" conflicts="" provides="" create-package $@ \
-		>> $(log_file).info 2>> $(log_file).err \
-	) ; :
+		>> $(log_file).info 2>> $(log_file).err ; \
+	else \
+		echo -e "\033[0;35;40m>> no '$(pkg_fake_root_man_dir)' directory\033[0m" ; \
+	fi
 
 package_dev = $(repository_directory)/$(ARCH)/$(name)-dev-$(version)-r$(release).$(package_ext)
 package_dev: $(package_dev)
 $(package_dev):
 	@echo "Packaging $@"
 	$(Q)cd $(pkg_fake_root_dir) && create-split-dev >> $(log_file).info 2>> $(log_file).err
-	$(Q)[ -d "$(pkg_fake_root_dev_dir)" ] && ( \
+	$(Q)if [ -d "$(pkg_fake_root_dev_dir)" ] ; then \
 		cd $(pkg_fake_root_dev_dir) ; \
-		for F in `ls data* 2>/dev/null` ; do rm $F ; done; : ; \
 		dependencies="" conflicts="" provides="" create-package $@ \
-		>> $(log_file).info 2>> $(log_file).err \
-	) ; :
+		>> $(log_file).info 2>> $(log_file).err ; \
+	else \
+		echo -e "\033[0;35;40m>> no '$([ -)' directory\033[0m" ; \
+	fi
 
 package_libs = $(repository_directory)/$(ARCH)/$(name)-libs-$(version)-r$(release).$(package_ext)
 package_libs: $(package_libs)
 $(package_libs):
 	@echo "Packaging $@"
 	$(Q)cd $(pkg_fake_root_dir) && create-split-libs >> $(log_file).info 2>> $(log_file).err
-	$(Q)[ -d "$(pkg_fake_root_libs_dir)" ] && ( \
+	$(Q)if [ -d "$(pkg_fake_root_libs_dir)" ] ; then \
 		cd $(pkg_fake_root_libs_dir) ; \
-		for F in `ls data* 2>/dev/null` ; do rm $F ; done; : ; \
 		dependencies="" conflicts="" provides="" create-package $@ \
-		>> $(log_file).info 2>> $(log_file).err \
-	) ; :
+		>> $(log_file).info 2>> $(log_file).err ; \
+	else \
+		echo -e "\033[0;35;40m>> no '$(pkg_fake_root_libs_dir)' directory\033[0m" ; \
+	fi
 
 
 check_binaries:
@@ -312,6 +316,7 @@ check_binaries:
 	which ftp >/dev/null || which wget >/dev/null
 	which tar >/dev/null && which xz >/dev/null
 	which unzip zstd strip >/dev/null
+	which uuidgen >/dev/null
 	[ $(PACKAGE_MANAGER) = "apk" ] && which abuild-sign abuild-tar >/dev/null || :
 	@echo "Checking for required binaries (ftp or wget, tar & xz, unzip, zstd, strip): done"
 
@@ -322,6 +327,7 @@ packages: create_repository_dir splits package_base
 build-env: check_binaries download extract patching
 create: build-env configure build fake_root_install packages clean_working_dir
 
+include $(SYSCONF)/package.local.mk
 
 # Targets not representing a file on the FS.
 .PHONY: check_binaries download* splits package* build-env \
