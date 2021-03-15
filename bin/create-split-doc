@@ -7,4 +7,4 @@
 # For documentation, move any file or directory matching:
 # - "/share/doc"
 
-create_split ${pkg_fake_root_doc_dir} "/share/doc/"
+create_split ${pkg_fake_root_doc_dir} "/share/doc/" "/share/info/"
