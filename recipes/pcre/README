@@ -1,0 +1,2 @@
+man pages are currently in $(PREFIX)/man and that is why there is no -man split
+they belong in $(PREFIX)/share/man
