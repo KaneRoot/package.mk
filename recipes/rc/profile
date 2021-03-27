@@ -1,0 +1,56 @@
+#!/bin/sh
+
+path_sanitize() {
+	echo "${1}" | /bin/sed 's|//|/|g'
+}
+
+path_add() {
+	path="$1"
+	entry="$(path_sanitize "$2")"
+
+	if [ -z "$path" ]; then
+		echo "$entry"
+	else
+		echo "$path:$entry"
+	fi
+}
+
+path_remove() {
+	path="$1"
+	entry="$(path_sanitize "$2")"
+
+	# If $entry is the last entry.
+	if [ "${path##*:}" = "$entry" ]; then
+		echo "${path%:*}"
+		return 0
+	fi
+
+	echo "$path" | /bin/sed "s|$entry:||"
+}
+
+prefix_add() {
+	prefix="$1"
+
+	PATH="$(path_add "$PATH" "$prefix/bin")"
+	PATH="$(path_add "$PATH" "$prefix/sbin")"
+}
+
+prefix_remove() {
+	prefix="$1"
+
+	PATH="$(path_remove "$PATH" "$prefix/bin")"
+	PATH="$(path_remove "$PATH" "$prefix/sbin")"
+}
+
+PATH=
+
+# Latest will usually be used first. More can be added with new calls
+# to prefix_add.
+prefix_add /
+prefix_add /usr/weirdos
+prefix_add /usr/local
+
+# Use these instructions to remove already defined prefixes.
+#prefix_remove /usr/weirdos
+#prefix_remove /usr/local
+

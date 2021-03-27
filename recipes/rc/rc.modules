@@ -1,0 +1,12 @@
+#!/bin/zsh
+#
+# /etc/rc.modules: module initialization script
+#
+
+/sbin/depmod -a
+
+# FIXME: Is this even necessary? Is this even *desirable*?
+/bin/busybox find /sys -name modalias -type f -print0 | xargs -0 sort -u \
+	| /bin/bin/busybox xargs modprobe -b -a 2> /dev/null
+
+# End of file
