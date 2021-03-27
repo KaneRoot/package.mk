@@ -1,0 +1,3 @@
+In the configure script, warnings are written in the error output, but missing libraries that forbid to continue building the application are in the standard output.
+
+On Alpine Linux: libnpth is named npth
