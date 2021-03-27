@@ -53,8 +53,7 @@ MAKE_INSTALL_OPTIONS ?= DESTDIR=$(pkg_fake_root_dir) \
 CMAKE_OPTIONS_USER ?= 
 CMAKE_OPTIONS ?= -DCMAKE_INSTALL_PREFIX=$(PREFIX) \
 	-DCMAKE_BUILD_TYPE=Release \
-	$(CMAKE_OPTIONS_USER) \
-	-- -j$(JOBS)
+	$(CMAKE_OPTIONS_USER)
 
 tarballs_directory   = /tmp/src# where to store package sources
 repository_directory = /tmp/pkg# local package repository
