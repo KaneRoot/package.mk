@@ -1,9 +1,3 @@
-# Preferences, default environment.
-
-# TODO:
-# - install build dependencies
-# - chroot build
-
 # Used by default for working directory and log file names
 gen_uuid != uuidgen
 
