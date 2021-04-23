@@ -1,0 +1,13 @@
+This recipe is way more complex in AlpineLinux.
+A lot of stuff was removed, such as sql, json, python, redis, geoip...
+
+See also, these files:
+	$(name).conf
+	$(name).logrotate
+	$(name).initd
+
+They belong in the final package.
+
+DOESN'T COMPILE
+
+The configure script asks for glib.
