@@ -1,0 +1,52 @@
+#!/bin/sh
+
+requires_linking="true"
+is_cpp=false
+
+if [ "$(basename $0)" = "clang++" ]; then
+	is_cpp=true
+fi
+
+for i; do
+	case "$i" in
+		-c)
+			requires_linking="false"
+		;;
+		-std=*)
+			std="$(printf "%s" "$i" | sed 's:-std=::')"
+
+			if echo "$std" | grep -E -q '(c\+\+|gnu\+\+)'; then
+				is_cpp=true
+			else
+				is_cpp=false
+			fi
+		;;
+	esac
+done
+
+cpp_flags=
+if $is_cpp; then
+	cpp_flags="
+		-cxx-isystem /usr/weirdos/lib/c++/v1
+	"
+fi
+
+linker_flags=
+if $requires_linking; then
+	linker_flags="
+		-L /usr/weirdos/lib
+		-L /usr/weirdos/lib/gcc/x86_64-weird-linux-musl/9.1.0/
+		-B /usr/weirdos/lib/gcc/x86_64-weird-linux-musl/9.1.0/
+		-Wl,--dynamic-linker /lib/ld-musl-x86_64.so.1
+	"
+
+	if $is_cpp; then
+		cpp_flags="$cpp_flags -lc++ -lc++abi"
+	fi
+fi
+
+clang-8 \
+	-isystem /usr/weirdos/include/ \
+	$linker_flags \
+	$cpp_flags \
+	"$@"

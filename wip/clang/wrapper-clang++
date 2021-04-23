@@ -1,0 +1,8 @@
+#!/bin/sh
+
+clang-8 -L %{prefix}/lib \
+	-L %{prefix}/lib/gcc/x86_64-weird-linux-musl/9.1.0/ \
+	-B %{prefix}/lib/gcc/x86_64-weird-linux-musl/9.1.0/ \
+	-Wl,--dynamic-linker /lib/ld-musl-x86_64.so.1 \
+	-isystem %{prefix}/include/ \
+	"$@"

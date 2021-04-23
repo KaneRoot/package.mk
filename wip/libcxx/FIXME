@@ -1,0 +1,3 @@
+Make Error at CMakeLists.txt:5 (message):
+  libc++ now requires being built in a monorepo layout with libcxxabi
+  available
