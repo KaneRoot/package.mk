@@ -8,6 +8,7 @@ Q ?= @
 SLOT       ?= /usr/baguette
 PREFIX     := $(SLOT)
 BINDIR     := $(PREFIX)/bin
+SBINDIR    := $(PREFIX)/sbin
 LIBDIR     := $(PREFIX)/lib
 SHAREDIR   := $(PREFIX)/share
 INCLUDEDIR := $(PREFIX)/include
@@ -29,7 +30,6 @@ JOBS ?= 1
 builddir => bdir
 pkgdir => pkg_fake_root_dir
 srcdir => source_directory
-scripts != ls $(name).(pre|post)-(install|update|deinstall) 2>/dev/null
 
 # Options
 #chrooted ?= false
@@ -39,9 +39,9 @@ keep_build_env ?= false
 install_build_dependencies ?= check_build_dependencies
 check_build_dependencies:
 	@echo -e "\033[1;35;47mbuild-dependencies: $(build-dependencies)\033[0m"
-	$(Q)[ $(ignore_build_deps) != "false" ] && echo "ignoring" || install-packages $(build-dependencies)
+	$(Q)[ "$(ignore_build_deps)" != "false" ] && echo "ignoring" || install-packages $(build-dependencies)
 
-export SLOT PREFIX BINDIR LIBDIR SHAREDIR INCLUDEDIR MANDIR
+export SLOT PREFIX BINDIR SBINDIR LIBDIR SHAREDIR INCLUDEDIR MANDIR
 
 CC ?= clang
 CXX ?= clang++
