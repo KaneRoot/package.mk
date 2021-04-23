@@ -3,6 +3,7 @@ version = 1.25.3
 release = 0
 URL = http://ftp.debian.org/debian/pool/main/f/fakeroot/fakeroot_$(version).orig.tar.gz
 url = "https://packages.debian.org/fakeroot"
+
 arch="all"
 license="GPL-3.0-or-later"
 
@@ -10,12 +11,9 @@ pkgdesc="Gives a fake root environment, useful for building packages as a non-pr
 
 patches != ls *.patch
 
-dependencies = util-linux
-build-dependencies = nasm linux-dev util-linux-dev
-
 makedepends_build = libtool autoconf automake po4a
 makedepends_host = libcap-dev acl-dev linux-headers
-makedepends = $(makedepends_build) $(makedepends_host)
+build-dependencies = $(makedepends_build) $(makedepends_host)
 
 CONFIG_SHELL = /bin/sh  
 export CONFIG_SHELL
