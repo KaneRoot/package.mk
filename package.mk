@@ -36,7 +36,12 @@ srcdir => source_directory
 ignore_build_deps ?= false
 keep_build_env ?= false
 
+# Do not try to install dependencies when there is none.
+ifeq ("$(build-dependencies)", "")
+install_build_dependencies ?=
+else
 install_build_dependencies ?= check_build_dependencies
+endif
 check_build_dependencies:
 	@echo -e "\033[1;35;47mbuild-dependencies: $(build-dependencies)\033[0m"
 	$(Q)[ "$(ignore_build_deps)" != "false" ] && echo "ignoring" || install-packages $(build-dependencies)
