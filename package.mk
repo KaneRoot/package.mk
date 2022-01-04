@@ -65,7 +65,7 @@ pkg_build_par_dir ?= $(pkg_working_dir)/build/
 pkg_build_dir     ?= $(pkg_build_par_dir)/$(name)-$(version)
 pkg_fake_root_dir ?= $(pkg_working_dir)/root
 
-log_file ?= $(WORKING_DIR)/$(UUID)/log
+log_file ?= $(pkg_working_dir)/log
 log_it = >> $(log_file).info 2>> $(log_file).err
 log_patching = >> $(log_file).patching.info 2>> $(log_file).patching.err
 
